@@ -228,7 +228,8 @@ check_home(struct ldc1612 *ld, uint32_t data)
         }
         //Start check
         if (ld->check_flag) {
-            uint8_t trigger_factor = slope > 5500 ? (slope > 8500 ? (slope > 10000 ? 3 : 5) : 12) : 25;
+            // slope > 5500 ? (slope > 8500 ? (slope > 10000 ? 3 : 5) : 15) : 27
+            uint8_t trigger_factor = 27 - (12 * (slope > 5500)) - (10 * (slope > 8500)) - (2 * (slope > 10000));
             if (ld->corner_cnt > trigger_factor) {
                 notify_trigger(ld, time, ld->trigger_reason);
             }
@@ -286,7 +287,7 @@ ldc1612_query(struct ldc1612 *ld, uint8_t oid)
                     | ((uint32_t)d[3]);
     check_home(ld, data);
     
-    sendf("ldc1612_query_loop_report freq=%u", (uint32_t)data);
+    // sendf("ldc1612_query_loop_report freq=%u", (uint32_t)data);
 
     // Flush local buffer if needed
     if (ld->sb.data_count + BYTES_PER_SAMPLE > ARRAY_SIZE(ld->sb.data))

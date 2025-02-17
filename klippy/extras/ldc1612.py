@@ -244,7 +244,7 @@ class LDC1612:
                       params["dr_data"],  params["err_code"])
     def write_data_to_file(self, time_value, z_pos, frequency_value):
         try:
-            with open('/home/sovol/klipper/klippy/extras/sensor_data.txt', 'a') as file:  # 'a'追加模式
+            with open('/home/sovol/klipper/klippy/extras/sensor_data.txt', 'a') as file:
                 file.write(f"{time_value} {z_pos} {frequency_value}\n")
                 file.flush()
         except FileNotFoundError as e:
@@ -261,27 +261,16 @@ class LDC1612:
         gcmd.respond_info("rest_ticks:%u" % (rest_ticks))
         self.query_ldc1612_cmd.send([self.oid, rest_ticks])
     def _response_query_loop(self, params):
-        # toolhead = self.printer.lookup_object('toolhead')
-        # pos = toolhead.get_position()
-        # pos = self.printer.lookup_object('toolhead').get_position()
         kin = self.printer.lookup_object('toolhead').get_kinematics()
         _stepper_z = kin.get_steppers()[2]
         _z_cmd_pos = _stepper_z.get_commanded_position()
-
         self.last_freq = self.freq
         self.freq = params['freq']
         self.time_record+=1
         self.freq_array.append(self.freq)
         self.write_data_to_file(self.time_record, _z_cmd_pos, self.freq)
-        # if self.freq_array.count(self.freq) == 0:
-        #     self.freq_array.append(self.freq)
-        #     print(f'freq_array:{self.freq_array}')
         # if self.freq != self.last_freq:
         #     self.write_data_to_file(self.time_record, _z_cmd_pos, self.freq)
-
-        # kin = self.printer.lookup_object('toolhead').get_kinematics()
-        # _stepper_z = kin.get_steppers()[2]
-        # _z_s_dist, _z_s_pr = _stepper_z.get_rotation_distance()
-        # _z_cmd_pos = _stepper_z.get_commanded_position()
-        # _z_mcu_pos = _stepper_z.get_mcu_position()
-        # print(f'_z_cmd_pos:{_z_cmd_pos} _z_mcu_pos:{_z_mcu_pos} _z_s_dist:{_z_s_dist} _z_s_pr:{_z_s_pr}')
+        if self.freq_array.count(self.freq) == 0:
+            self.freq_array.append(self.freq)
+            print(f'freq_array:{self.freq_array}')
