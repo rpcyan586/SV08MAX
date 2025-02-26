@@ -14,7 +14,6 @@
 #include "command.h" // shutdown
 #include "sched.h" // sched_check_periodic
 #include "stepper.h" // stepper_event
-#include "UC1701.h"
 
 static struct timer periodic_timer, sentinel_timer, deleted_timer;
 
@@ -317,7 +316,6 @@ run_shutdown(int reason)
     extern void ctr_run_shutdownfuncs(void);
     ctr_run_shutdownfuncs();
     SchedStatus.shutdown_status = 1;
-    uc1701_shutdown(reason);
     irq_enable();
 
     sendf("shutdown clock=%u static_string_id=%hu", cur
