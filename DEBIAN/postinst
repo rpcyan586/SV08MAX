@@ -19,7 +19,7 @@ chmod +x /usr/bin/makerbase-automount
 chmod +x /home/sovol/uart
 
 #自动获取摄像头服务
-chmod +x /home/sovol/auto-webcam-id.sh
+# chmod +x /home/sovol/auto-webcam-id.sh
 # systemctl enable makerbase-webcam.service
 
 #soc更新mcu
