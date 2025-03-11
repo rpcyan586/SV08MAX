@@ -126,7 +126,7 @@ class GCodeMove:
     def cmd_G1(self, gcmd):
         # Move
         params = gcmd.get_command_parameters()
-        if 'G' in params and 'X' in params and 'Y' in params and 'Z' in params:
+        if False:   #'G' in params and 'X' in params and 'Y' in params and 'Z' in params:
             if self.v_sd.cmd_from_sd:
                 #commandline = gcmd.get_commandline()
                 cfg_file_path = '/home/sovol/printer_data/config/saved_variables.cfg'
