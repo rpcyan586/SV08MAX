@@ -41,4 +41,5 @@ fi
 
 echo "Executing mount $1"
 mkdir -p "$mediadir"
-sudo mount -t auto -o uid=sovol -o gid=sovol "$dev" "$mediadir"
+sudo mount -t auto -o uid=sovol -o gid=sovol -o iocharset=utf8 "$dev" "$mediadir"
+
