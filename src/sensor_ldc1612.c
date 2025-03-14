@@ -178,12 +178,12 @@ calc_sliding_window_slope(struct ldc1612 *ld, int32_t t, int32_t f)
     _tdd->time_wd[_tdd->wd_num] = t;
     _tdd->freq_wd[_tdd->wd_num] = f;
     _tdd->wd_num = (_tdd->wd_num + 1) % WINDOW_SIZE;
-    //Initialization window
+    // Initialization window
     if (ld->window_member_cnt < WINDOW_SIZE) {
         ++(ld->window_member_cnt);
         goto out;
     }
-    //Calculate slope
+    // Calculate slope = (nΣxy - ΣxΣy)/(nΣx² - (Σx)²)
     slope = (int32_t)(((WINDOW_SIZE * _tdd->sum_xy) - (_tdd->sum_x * _tdd->sum_y)) / ((WINDOW_SIZE * _tdd->sum_xx) - (_tdd->sum_x * _tdd->sum_x)));
 out:
     return slope;
@@ -215,9 +215,9 @@ check_home(struct ldc1612 *ld, uint32_t data)
     }
     else if (homing_flags & LH_WANT_TOUCH_HOMING) {
         int32_t slope = calc_sliding_window_slope(ld, ++(ld->cnt_as_time), (data % 10000000));
-        ld->corner_cnt = (slope < ld->last_slope && ld->last_data <= data) ? (ld->corner_cnt + 1) : 0;
+        ld->corner_cnt += (uint8_t)(slope < ld->last_slope && ld->last_data <= data);
         ld->last_slope = slope;
-        //Await
+        // Await
         if (homing_flags & LH_AWAIT_TOUCH_HOMING) {
             if (timer_is_before(time, ld->homing_clock))
                 return;
@@ -226,7 +226,7 @@ check_home(struct ldc1612 *ld, uint32_t data)
         if (!ld->check_flag && slope > START_THRESHOLD_SLOPE) {
             ld->check_flag = 1;
         }
-        //Start check
+        // Start check
         if (ld->check_flag) {
             // slope > 5500 ? (slope > 8500 ? (slope > 10000 ? 3 : 5) : 15) : 27
             uint8_t trigger_factor = 27 - (12 * (slope > 5500)) - (10 * (slope > 8500)) - (2 * (slope > 10000));
