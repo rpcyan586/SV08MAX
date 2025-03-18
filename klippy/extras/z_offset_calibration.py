@@ -85,9 +85,9 @@ class ZoffsetCalibration:
         ## zendstop_p = self.printer.lookup_object('probe_pressure').run_probe(gcmd)
         reprobe_cnt = 1
         while True:
-            if(reprobe_cnt >= 6):
+            if(reprobe_cnt >= 10):
                 self.gcode.run_script_from_command('M117 Tip code: 109')
-                raise gcmd.error('ZoffsetCalibration: Toolhead probe more than five times.')
+                raise gcmd.error('ZoffsetCalibration: Toolhead probe more than ten times.')
             ## perform z hop
             if self.z_hop:
                 pos = self.toolhead.get_position()
@@ -95,12 +95,12 @@ class ZoffsetCalibration:
                 if pos[2] > z_max_position:
                     pos[2] = z_max_position
                 self.toolhead.manual_move([None, None, pos[2]], 5)
-            gcmd.respond_info("ZoffsetCalibration: Toolhead verifying the difference between before and after %d/5." % (reprobe_cnt))
+            gcmd.respond_info("ZoffsetCalibration: Toolhead verifying the difference between before and after %d/10." % (reprobe_cnt))
             zendstop_p1 = _contact_probe.run_contact_probe(gcmd)
             ## zendstop_p1 = self.printer.lookup_object('probe_pressure').run_probe(gcmd)
             diff_z = abs(zendstop_p1[2] - zendstop_p[2])
             zendstop_p = zendstop_p1
-            if diff_z <= 0.03:
+            if diff_z <= 0.0125:
                 gcmd.respond_info("ZoffsetCalibration: Toolhead check success.")
                 break
             reprobe_cnt += 1
