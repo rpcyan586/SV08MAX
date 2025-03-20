@@ -126,25 +126,11 @@ class GCodeMove:
     def cmd_G1(self, gcmd):
         # Move
         params = gcmd.get_command_parameters()
-        if False:   #'G' in params and 'X' in params and 'Y' in params and 'Z' in params:
+        if 'G' in params and 'X' in params and 'Y' in params and 'Z' in params:
             if self.v_sd.cmd_from_sd:
-                #commandline = gcmd.get_commandline()
-                cfg_file_path = '/home/sovol/printer_data/config/saved_variables.cfg'
-                _config = configparser.ConfigParser()
-                _config.read(cfg_file_path)
-                was_inter = _config.get('Variables', 'was_interrupted')
-                last_file = _config.get('Variables', 'last_file')
-                if 'Z' in params and float(params['Z']) > 0.2 and was_inter == 'False' and 'zoffset_test.gcode' not in last_file:
-                    self.modify_cfg_value('was_interrupted', "True")
-
-                # if 'Z' in params:       #for test
-                #     self.z_positon = params['Z']
-                # if self.z_positon != "":    #for test
                 content = {
                     'commandline': gcmd.get_commandline(),
-                    'Z': params['Z'],                       #self.z_positon, 
-                    'extrude_type': 'M82' if self.absolute_extrude else 'M83',
-                    'e_extrude_abs': 0 #self.Coord(*self.move_position)[3]
+                    'Z': params['Z']
                 }
                 with open("/home/sovol/sovol_plr_height", 'w') as height:
                     json.dump(content, height)

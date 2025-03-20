@@ -215,7 +215,7 @@ check_home(struct ldc1612 *ld, uint32_t data)
     }
     else if (homing_flags & LH_WANT_TOUCH_HOMING) {
         int32_t slope = calc_sliding_window_slope(ld, ++(ld->cnt_as_time), (data % 10000000));
-        ld->corner_cnt += (uint8_t)(slope < ld->last_slope && ld->last_data <= data);
+        ld->corner_cnt = (slope < ld->last_slope && ld->last_data <= data) ? (ld->corner_cnt + 1) : 0;
         ld->last_slope = slope;
         // Await
         if (homing_flags & LH_AWAIT_TOUCH_HOMING) {

@@ -12,6 +12,9 @@ chmod +x /home/sovol/clear_plr.sh
 chmod +x /home/sovol/plr.sh
 chmod +x /home/sovol/zhongchuang/build/script.py
 
+chmod 777 /home/mount.log
+echo '' > /home/mount.log
+
 #自动卸载挂载点
 chmod +x /usr/bin/makerbase-automount
 
