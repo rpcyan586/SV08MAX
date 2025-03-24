@@ -65,7 +65,7 @@ cat /home/sovol/plrtmpA.$$ | sed -ne '/;End of Gcode/,$ p' | tr '\n' ' ' | sed -
 if [[ "$commandline" == *"F"* ]]; then
     adjusted_height=$(echo "$height + 5" | bc)
 else
-    adjusted_height=$(echo "$height + 4.8" | bc)
+    adjusted_height=$(echo "$height + 5" | bc)
 fi
 
 echo "SET_KINEMATIC_POSITION Z=$adjusted_height" >> ${PLR_PATH}/"${plr}"  #chris
