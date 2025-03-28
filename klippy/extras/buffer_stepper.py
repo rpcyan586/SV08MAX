@@ -1,16 +1,12 @@
-# Support for a manual controlled stepper
-#
 # Copyright (C) 2025  Sovol3d <info@sovol3d.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-#
-# Edit By Xeno for automated stepper in Bambu-like Filament Buffer system.
 
 import stepper, chelper, logging, toolhead
 from . import force_move
 
 MIN_KIN_TIME = 0.100
-SDS_CHECK_TIME = 0.001 # step+dir+step filter in stepcompress.c
+SDS_CHECK_TIME = 0.001 
 
 class BufferStepper:
     def __init__(self, config):
@@ -27,16 +23,19 @@ class BufferStepper:
         self.kin_flush_delay = SDS_CHECK_TIME
         self.last_kin_flush_time = self.last_kin_move_time = 0.
         self.buffer_time_start = config.getfloat('buffer_time_start', 0.250, above=0.)
-        
-        self.event_delay = config.getfloat('event_delay', 1.0, above=0.)
+
+        buttons = self.printer.load_object(config, 'buttons')
+        self.push = config.get('push_pin')
+        buttons.register_buttons([self.push], self._push_handler)
+        self.push_triggered = False
         self.min_event_systime = self.reactor.NEVER
         self.rail = stepper.PrinterStepper(config)
-        self.is_manual_feeding = False
-        
+        self.event_delay = config.getfloat('event_delay', 1.0, above=0.)
+
         self.steppers = [self.rail]
-        self.velocity = config.getfloat('velocity', 5., above=0.)
-        self.accel = self.homing_accel = config.getfloat('accel', 0., minval=0.)
-        self.push_length = config.getfloat('push_length', 15., minval=1.)
+        self.velocity = config.getfloat('velocity', 50., above=0.)
+        self.accel = self.homing_accel = config.getfloat('accel', 5000., minval=0.)
+        self.push_length = config.getfloat('push_length', 25., minval=1.)
         self.next_cmd_time = 0.
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -45,13 +44,26 @@ class BufferStepper:
         self.stepper_kinematics = ffi_main.gc(ffi_lib.cartesian_stepper_alloc(b'x'), ffi_lib.free)
         self.rail.set_stepper_kinematics(self.stepper_kinematics)
         self.rail.set_trapq(self.trapq)
-        
+
         # Register commands
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
+        self.print_stats = self.printer.load_object(config, 'print_stats')
         self.gcode.register_mux_command('BUFFER_STEPPER', "STEPPER",
                                     stepper_name, self.cmd_BUFFER_STEPPER,
                                     desc=self.cmd_BUFFER_STEPPER_help)
 
+    def _push_handler(self, eventtime, state):
+        if state == self.push_triggered:
+            return
+        self.push_triggered = state
+        eventtime = self.reactor.monotonic()
+        filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
+        filament_detected = filament_sensor.runout_helper.filament_present
+        if eventtime < self.min_event_systime:
+            return
+        if self.push_triggered and filament_detected:      
+            self.do_move(self.push_length, self.velocity, self.accel)
+            self.reactor.register_callback(self._check_filament_jam, eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay)
     def _handle_ready(self):
         self.min_event_systime = self.reactor.monotonic() + 0.5
     def sync_print_time(self):
@@ -63,7 +75,7 @@ class BufferStepper:
         kin_time += self.kin_flush_delay
         min_print_time = max(est_print_time + self.buffer_time_start, kin_time)
         if min_print_time > self.next_cmd_time:
-            self.next_cmd_time = min_print_time      
+            self.next_cmd_time = min_print_time
     def do_enable(self, enable):
         self.sync_print_time()
         stepper_enable = self.printer.lookup_object('stepper_enable')
@@ -92,6 +104,21 @@ class BufferStepper:
                                   self.next_cmd_time + 99999.9)
         #froce mcu to flush moving command
         self.mcu.flush_moves(self.next_cmd_time, self.next_cmd_time - 30.0)
+    def get_move_duration(self, movepos, speed, accel):
+        dist = movepos
+        axis_r, accel_t, cruise_t, cruise_v = force_move.calc_move_time(
+            dist, speed, accel)
+        return accel_t + cruise_t + accel_t
+    def _check_filament_jam(self, eventtime):
+        if self.push_triggered:
+            self.gcode.respond_info("Filament jam detected! Push pin is still triggered after move.")
+            self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
+            self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
+            if self.print_stats is not None and self.print_stats.state == 'printing':
+                self.gcode.run_script_from_command("PAUSE")
+        else:
+            self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=1.00")
+            self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=0.00")
     cmd_BUFFER_STEPPER_help = "Command a manually configured stepper"
     def cmd_BUFFER_STEPPER(self, gcmd):
         enable = gcmd.get_int('ENABLE', None)
