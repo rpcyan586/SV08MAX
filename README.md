@@ -1,4 +1,4 @@
-sv08 mini
+sv08 MAX
 
 Welcome to the Klipper project!
 
