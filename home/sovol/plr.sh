@@ -46,7 +46,7 @@ echo "SET_KINEMATIC_POSITION Z=$height" >> ${PLR_PATH}/"${plr}"
 
 #升温防止扯模型
 echo 'M109 S160' >> ${PLR_PATH}/"${plr}"
-echo 'M190 S60' >> ${PLR_PATH}/"${plr}"
+echo 'M190 S65' >> ${PLR_PATH}/"${plr}"
 
 #抬升z轴，XY回零
 echo 'G91' >> ${PLR_PATH}/"${plr}"
