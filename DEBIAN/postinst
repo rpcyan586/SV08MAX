@@ -21,6 +21,10 @@ chmod +x /usr/bin/makerbase-automount
 #线刷屏幕固件
 chmod +x /home/sovol/uart
 
+echo "D /home/sovol/printer_data/temp 0755 sovol sovol 0" > /tmp/moonraker_temp.conf
+sudo mv /tmp/moonraker_temp.conf /etc/tmpfiles.d/
+systemd-tmpfiles --create
+
 #自动获取摄像头服务
 # chmod +x /home/sovol/auto-webcam-id.sh
 # systemctl enable makerbase-webcam.service
