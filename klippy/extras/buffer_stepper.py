@@ -35,7 +35,7 @@ class BufferStepper:
         self.steppers = [self.rail]
         self.velocity = config.getfloat('velocity', 50., above=0.)
         self.accel = self.homing_accel = config.getfloat('accel', 5000., minval=0.)
-        self.push_length = config.getfloat('push_length', 25., minval=1.)
+        self.push_length = config.getfloat('push_length', 18., minval=1.)
         self.next_cmd_time = 0.
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -57,11 +57,14 @@ class BufferStepper:
             return
         self.push_triggered = state
         eventtime = self.reactor.monotonic()
-        filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
-        filament_detected = filament_sensor.runout_helper.filament_present
         if eventtime < self.min_event_systime:
             return
-        if self.push_triggered and filament_detected:      
+        global_var = self.printer.lookup_object('gcode_macro _global_var')
+        status = global_var.get_status(eventtime)
+        is_push_buffer = status.get('is_push_buffer', True)
+        if self.push_triggered and is_push_buffer:            
+            self.gcode.run_script_from_command("UPDATE_DELAYED_GCODE ID=plug_stall_check DURATION=0")
+            self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=False")
             self.do_move(self.push_length, self.velocity, self.accel)
             self.reactor.register_callback(self._check_filament_jam, eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay)
     def _handle_ready(self):
@@ -110,15 +113,23 @@ class BufferStepper:
             dist, speed, accel)
         return accel_t + cruise_t + accel_t
     def _check_filament_jam(self, eventtime):
-        if self.push_triggered:
-            self.gcode.respond_info("Filament jam detected! Push pin is still triggered after move.")
-            self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
-            self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
-            if self.print_stats is not None and self.print_stats.state == 'printing':
-                self.gcode.run_script_from_command("PAUSE")
-        else:
-            self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=1.00")
-            self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=0.00")
+        filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
+        filament_detected = filament_sensor.runout_helper.filament_present
+        if filament_detected:
+            if self.push_triggered:
+                self.gcode.respond_info("Filament jam detected! Push pin is still triggered after move.")
+                if self.print_stats is not None and self.print_stats.state == 'printing':
+                    self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
+                    self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
+                    self.gcode.run_script_from_command("PAUSE")
+                    self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=True")
+            else:
+                self.gcode.run_script_from_command("UPDATE_DELAYED_GCODE ID=plug_stall_check DURATION=1")
+                self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=True")
+                self.gcode.run_script_from_command("FILAMENT_USED")
+                self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=1.00")
+                self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=0.00")
+                self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=False")
     cmd_BUFFER_STEPPER_help = "Command a manually configured stepper"
     def cmd_BUFFER_STEPPER(self, gcmd):
         enable = gcmd.get_int('ENABLE', None)
