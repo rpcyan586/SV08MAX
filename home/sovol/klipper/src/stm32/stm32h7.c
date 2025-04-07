@@ -252,6 +252,8 @@ armcm_main(void)
     gpio_out_setup(GPIO('E', 11), 0);
     gpio_peripheral(GPIO('D', 12), GPIO_OUTPUT, 0);
     gpio_out_setup(GPIO('D', 12), 0);
+    gpio_peripheral(GPIO('E', 14), GPIO_OUTPUT, 0);
+    gpio_out_setup(GPIO('E', 14), 1); 
 
     sched_main();
 }
