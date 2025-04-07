@@ -35,7 +35,7 @@ class BufferStepper:
         self.steppers = [self.rail]
         self.velocity = config.getfloat('velocity', 50., above=0.)
         self.accel = self.homing_accel = config.getfloat('accel', 5000., minval=0.)
-        self.push_length = config.getfloat('push_length', 25., minval=1.)
+        self.push_length = config.getfloat('push_length', 18., minval=1.)
         self.next_cmd_time = 0.
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -115,9 +115,9 @@ class BufferStepper:
         if filament_detected:
             if self.push_triggered:
                 self.gcode.respond_info("Filament jam detected! Push pin is still triggered after move.")
-                self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
-                self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
                 if self.print_stats is not None and self.print_stats.state == 'printing':
+                    self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
+                    self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
                     self.gcode.run_script_from_command("PAUSE")
                     self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=True")
             else:
