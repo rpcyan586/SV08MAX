@@ -59,7 +59,10 @@ class BufferStepper:
         eventtime = self.reactor.monotonic()
         if eventtime < self.min_event_systime:
             return
-        if self.push_triggered:      
+        global_var = self.printer.lookup_object('gcode_macro _global_var')
+        status = global_var.get_status(eventtime)
+        is_push_buffer = status.get('is_push_buffer', True)
+        if self.push_triggered and is_push_buffer:            
             self.gcode.run_script_from_command("UPDATE_DELAYED_GCODE ID=plug_stall_check DURATION=0")
             self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=False")
             self.do_move(self.push_length, self.velocity, self.accel)
