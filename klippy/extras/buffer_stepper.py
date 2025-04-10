@@ -30,7 +30,7 @@ class BufferStepper:
         self.push_triggered = False
         self.min_event_systime = self.reactor.NEVER
         self.rail = stepper.PrinterStepper(config)
-        self.event_delay = config.getfloat('event_delay', 1.0, above=0.)
+        self.event_delay = config.getfloat('event_delay', 0.5, above=0.)
 
         self.steppers = [self.rail]
         self.velocity = config.getfloat('velocity', 50., above=0.)
@@ -63,7 +63,6 @@ class BufferStepper:
         status = global_var.get_status(eventtime)
         is_push_buffer = status.get('is_push_buffer', True)
         if self.push_triggered and is_push_buffer:            
-            self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=False")
             self.do_move(self.push_length, self.velocity, self.accel)
             self.reactor.register_callback(self._check_filament_jam, eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay)
     def _handle_ready(self):
@@ -132,7 +131,7 @@ class BufferStepper:
             else:
                 self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=False")
                 if self.print_stats.state == 'printing':
-                    self.gcode.run_script_from_command("FILAMENT_USED")
+                    self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
     cmd_BUFFER_STEPPER_help = "Command a manually configured stepper"
     def cmd_BUFFER_STEPPER(self, gcmd):
         enable = gcmd.get_int('ENABLE', None)
