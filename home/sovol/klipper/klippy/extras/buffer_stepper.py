@@ -30,7 +30,7 @@ class BufferStepper:
         self.push_triggered = False
         self.min_event_systime = self.reactor.NEVER
         self.rail = stepper.PrinterStepper(config)
-        self.event_delay = config.getfloat('event_delay', 1.0, above=0.)
+        self.event_delay = config.getfloat('event_delay', 0.5, above=0.)
 
         self.steppers = [self.rail]
         self.velocity = config.getfloat('velocity', 50., above=0.)
@@ -63,8 +63,6 @@ class BufferStepper:
         status = global_var.get_status(eventtime)
         is_push_buffer = status.get('is_push_buffer', True)
         if self.push_triggered and is_push_buffer:            
-            self.gcode.run_script_from_command("UPDATE_DELAYED_GCODE ID=plug_stall_check DURATION=0")
-            self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=False")
             self.do_move(self.push_length, self.velocity, self.accel)
             self.reactor.register_callback(self._check_filament_jam, eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay)
     def _handle_ready(self):
@@ -113,23 +111,27 @@ class BufferStepper:
             dist, speed, accel)
         return accel_t + cruise_t + accel_t
     def _check_filament_jam(self, eventtime):
+        if self.print_stats.state == 'paused' or getattr(self, '_in_pause', False):
+            return
         filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
         filament_detected = filament_sensor.runout_helper.filament_present
         if filament_detected:
             if self.push_triggered:
                 self.gcode.respond_info("Filament jam detected! Push pin is still triggered after move.")
                 if self.print_stats is not None and self.print_stats.state == 'printing':
-                    self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
-                    self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
-                    self.gcode.run_script_from_command("PAUSE")
-                    self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=True")
+                    try:
+                        self._in_pause = True
+                        self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=0.00")
+                        self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=1.00")
+                        self.gcode.run_script_from_command("PAUSE")
+                        self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=True")
+                        self.gcode.respond_info("Filament winding")
+                    finally:
+                        self._in_pause = False
             else:
-                self.gcode.run_script_from_command("UPDATE_DELAYED_GCODE ID=plug_stall_check DURATION=1")
-                self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=stall_triggered VALUE=True")
-                self.gcode.run_script_from_command("FILAMENT_USED")
-                self.gcode.run_script_from_command("SET_PIN PIN=green_led VALUE=1.00")
-                self.gcode.run_script_from_command("SET_PIN PIN=blue_led VALUE=0.00")
                 self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=False")
+                if self.print_stats.state == 'printing':
+                    self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
     cmd_BUFFER_STEPPER_help = "Command a manually configured stepper"
     def cmd_BUFFER_STEPPER(self, gcmd):
         enable = gcmd.get_int('ENABLE', None)
