@@ -62,7 +62,9 @@ class BufferStepper:
         global_var = self.printer.lookup_object('gcode_macro _global_var')
         status = global_var.get_status(eventtime)
         is_push_buffer = status.get('is_push_buffer', True)
-        if self.push_triggered and is_push_buffer:            
+        if self.push_triggered and is_push_buffer:         
+            if self.print_stats.state == 'printing':
+                self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
             self.do_move(self.push_length, self.velocity, self.accel)
             self.reactor.register_callback(self._check_filament_jam, eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay)
     def _handle_ready(self):
@@ -130,8 +132,6 @@ class BufferStepper:
                         self._in_pause = False
             else:
                 self.gcode.run_script_from_command("SET_GCODE_VARIABLE MACRO=variables VARIABLE=winding_status VALUE=False")
-                if self.print_stats.state == 'printing':
-                    self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
     cmd_BUFFER_STEPPER_help = "Command a manually configured stepper"
     def cmd_BUFFER_STEPPER(self, gcmd):
         enable = gcmd.get_int('ENABLE', None)
@@ -165,6 +165,12 @@ class BufferStepper:
         return [stepper_positions[self.rail.get_name()], 0., 0.]
     def debug_logging(self, message):
         self.gcode.respond_info(message)
+    def get_push_triggered(self):
+        return self.push_triggered
+    def get_status(self, eventtime):
+        return {
+            'push_triggered': self.push_triggered,
+    }
 
 def load_config_prefix(config):
     return BufferStepper(config)
