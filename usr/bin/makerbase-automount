@@ -59,3 +59,35 @@ if [ -f "$trigger_file" ]; then
 else
     echo "未检测到触发文件，跳过日志拷贝"
 fi
+
+
+# Path to the wifi.cfg file
+CONFIG_FILE="/home/sovol/printer_data/gcodes/sda1/wifi.cfg"
+
+# Check if the config file exists
+if [ -f "$CONFIG_FILE" ]; then
+    # Extract ssid and password from the config file
+    SSID=$(grep 'ssid' $CONFIG_FILE | cut -d'=' -f2 | tr -d '\r\n')
+    PASSWORD=$(grep 'password' $CONFIG_FILE | cut -d'=' -f2 | tr -d '\r\n')
+
+    # Check if you're already connected to the specified SSID
+    CURRENT_SSID=$(nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d':' -f2)
+    
+    if [ "$CURRENT_SSID" == "$SSID" ]; then
+        echo "Already connected to $SSID."
+    else
+        # Connect to the WiFi network
+        nmcli dev wifi connect "$SSID" password "$PASSWORD"
+
+        # Check if the connection was successful
+        if [ $? -eq 0 ]; then
+            echo "Connected to $SSID successfully."
+        else
+            echo "Failed to connect to $SSID."
+        fi
+    fi
+else
+    echo "Config file not found: $CONFIG_FILE"
+    # Exit with a non-zero status to indicate failure
+    # exit 1
+fi
