@@ -11,11 +11,9 @@ class ZoffsetCalibration:
     def __init__(self, config):
         self.printer = config.get_printer()
         self.config = config
-        x_pos_center, y_pos_center = config.getfloatlist("center_xy_position", count=2)
         x_pos_endstop, y_pos_endstop = config.getfloatlist("endstop_xy_position", count=2)
-        self.center_x_pos, self.center_y_pos = x_pos_center, y_pos_center
         self.endstop_x_pos, self.endstop_y_pos = x_pos_endstop, y_pos_endstop
-        self.z_hop = config.getfloat("z_hop", default=10.0)
+        self.z_hop = config.getfloat("z_hop", default=2.0)
         self.z_hop_speed = config.getfloat('z_hop_speed', 5., above=0.)
         self.zconfig = config.getsection('stepper_z')
         self.endstop_pin = self.zconfig.get('endstop_pin')
@@ -29,11 +27,6 @@ class ZoffsetCalibration:
         self.contact_probe_name = config.get('contact_probe', None)
         pprobe = self.printer.lookup_object("probe")
         self.x_offset, self.y_offset, self.z_offset = pprobe.get_offsets()
-        if self.x_offset == 0 and self.y_offset == 0:
-            raise config.error("ZoffsetCalibration: Check the x and y offset from [probe] - it seems both are 0 and the Probe can't be at the same position as the nozzle :-)")
-        probe_pressure = config.getsection('probe_pressure')
-        self.x_offsetp = probe_pressure.getfloat('x_offset', note_valid=False)
-        self.y_offsetp = probe_pressure.getfloat('y_offset', note_valid=False)
     def _call_macro(self, macro):
         self.gcode.run_script_from_command(macro)
     def cmd_Z_OFFSET_CALIBRATION(self, gcmd):
@@ -73,7 +66,8 @@ class ZoffsetCalibration:
             gcmd_G28 = self.gcode.create_gcode_command("G28", "G28", {'X': 0, 'Y': 0})
             phoming.cmd_G28(gcmd_G28)
         pos = self.toolhead.get_position()
-        pos[2] = z_max_position
+        z_limit_position = z_max_position + 15
+        pos[2] = z_limit_position
         self.toolhead.set_position(pos, homing_axes=(0, 1, 2))
         self.set_z_offset(offset=0.)
         # Move to probe position
@@ -82,7 +76,9 @@ class ZoffsetCalibration:
         # Contact probe calibration
         gcmd.respond_info("ZoffsetCalibration: Toolhead probing ...")
         zendstop_p = _contact_probe.run_contact_probe(gcmd)
-        ## zendstop_p = self.printer.lookup_object('probe_pressure').run_probe(gcmd)
+        pos = self.toolhead.get_position()
+        pos[2] = z_max_position - self.z_hop
+        self.toolhead.set_position(pos, homing_axes=(0, 1, 2))
         reprobe_cnt = 1
         while True:
             if(reprobe_cnt >= 10):
@@ -90,14 +86,12 @@ class ZoffsetCalibration:
                 raise gcmd.error('ZoffsetCalibration: Toolhead probe more than ten times.')
             ## perform z hop
             if self.z_hop:
-                pos = self.toolhead.get_position()
-                pos[2] += 2
+                pos[2] = self.toolhead.get_position()[2] + self.z_hop
                 if pos[2] > z_max_position:
                     pos[2] = z_max_position
                 self.toolhead.manual_move([None, None, pos[2]], 5)
             gcmd.respond_info("ZoffsetCalibration: Toolhead verifying the difference between before and after %d/10." % (reprobe_cnt))
             zendstop_p1 = _contact_probe.run_contact_probe(gcmd)
-            ## zendstop_p1 = self.printer.lookup_object('probe_pressure').run_probe(gcmd)
             diff_z = abs(zendstop_p1[2] - zendstop_p[2])
             zendstop_p = zendstop_p1
             if diff_z <= 0.0125:
