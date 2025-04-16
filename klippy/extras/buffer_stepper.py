@@ -30,7 +30,8 @@ class BufferStepper:
         self.push_triggered = False
         self.min_event_systime = self.reactor.NEVER
         self.rail = stepper.PrinterStepper(config)
-        self.event_delay = config.getfloat('event_delay', 1.0, above=0.)
+        self.event_delay = config.getfloat('event_delay', 0.5, above=0.)
+        self.current_check_id = 0
 
         self.steppers = [self.rail]
         self.velocity = config.getfloat('velocity', 100., above=0.)
@@ -67,12 +68,14 @@ class BufferStepper:
                 self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
             initial_push_state = self.push_triggered
             self.do_move(self.push_length, self.velocity, self.accel)
+            self.current_check_id += 1 
+            check_id = self.current_check_id
             self.reactor.register_callback(
-                lambda evt: self._check_filament_jam(evt, initial_push_state),
+                lambda evt: self._check_filament_jam(evt, initial_push_state, check_id),
                 eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay
             )
     def _handle_ready(self):
-        self.min_event_systime = self.reactor.monotonic() + 0.5
+        self.min_event_systime = self.reactor.monotonic() + 0.2
     def sync_print_time(self):
         self._calc_print_time()
     def _calc_print_time(self):
@@ -116,10 +119,8 @@ class BufferStepper:
         axis_r, accel_t, cruise_t, cruise_v = force_move.calc_move_time(
             dist, speed, accel)
         return accel_t + cruise_t + accel_t
-    def _check_filament_jam(self, eventtime, initial_push_state):
-        if self.push_triggered != initial_push_state:
-            return
-        if self.print_stats.state == 'paused' or getattr(self, '_in_pause', False):
+    def _check_filament_jam(self, eventtime, initial_push_state, check_id):
+        if self.current_check_id != check_id or self.push_triggered != initial_push_state or self.print_stats.state == 'paused' or getattr(self, '_in_pause', False):
             return
         filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
         filament_detected = filament_sensor.runout_helper.filament_present
