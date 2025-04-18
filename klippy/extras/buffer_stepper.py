@@ -5,7 +5,7 @@
 import stepper, chelper, logging, toolhead
 from . import force_move
 
-MIN_KIN_TIME = 0.100
+MIN_KIN_TIME = 0.050
 SDS_CHECK_TIME = 0.001 
 
 class BufferStepper:
@@ -22,7 +22,7 @@ class BufferStepper:
         self.reactor = self.printer.get_reactor()
         self.kin_flush_delay = SDS_CHECK_TIME
         self.last_kin_flush_time = self.last_kin_move_time = 0.
-        self.buffer_time_start = config.getfloat('buffer_time_start', 0.250, above=0.)
+        self.buffer_time_start = config.getfloat('buffer_time_start', 0.100, above=0.)
 
         buttons = self.printer.load_object(config, 'buttons')
         self.push = config.get('push_pin')
@@ -30,13 +30,13 @@ class BufferStepper:
         self.push_triggered = False
         self.min_event_systime = self.reactor.NEVER
         self.rail = stepper.PrinterStepper(config)
-        self.event_delay = config.getfloat('event_delay', 0.5, above=0.)
+        self.event_delay = config.getfloat('event_delay', 2.0, above=0.)
         self.current_check_id = 0
 
         self.steppers = [self.rail]
-        self.velocity = config.getfloat('velocity', 100., above=0.)
+        self.velocity = config.getfloat('velocity', 150., above=0.)
         self.accel = self.homing_accel = config.getfloat('accel', 5000., minval=0.)
-        self.push_length = config.getfloat('push_length', 22., minval=1.)
+        self.push_length = config.getfloat('push_length', 25., minval=1.)
         self.next_cmd_time = 0.
         ffi_main, ffi_lib = chelper.get_ffi()
         self.trapq = ffi_main.gc(ffi_lib.trapq_alloc(), ffi_lib.trapq_free)
@@ -54,28 +54,26 @@ class BufferStepper:
                                     desc=self.cmd_BUFFER_STEPPER_help)
 
     def _push_handler(self, eventtime, state):
-        if state == self.push_triggered:
-            return
         self.push_triggered = state
         eventtime = self.reactor.monotonic()
         if eventtime < self.min_event_systime:
             return
+        self.current_check_id += 1 
         global_var = self.printer.lookup_object('gcode_macro _global_var')
         status = global_var.get_status(eventtime)
         is_push_buffer = status.get('is_push_buffer', True)
-        if self.push_triggered and is_push_buffer:         
+        if self.push_triggered and is_push_buffer:
+            self.do_move(self.push_length, self.velocity, self.accel)       
             if self.print_stats.state == 'printing':
                 self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
             initial_push_state = self.push_triggered
-            self.do_move(self.push_length, self.velocity, self.accel)
-            self.current_check_id += 1 
-            check_id = self.current_check_id
+            check_id = self.current_check_id 
             self.reactor.register_callback(
                 lambda evt: self._check_filament_jam(evt, initial_push_state, check_id),
                 eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay
             )
     def _handle_ready(self):
-        self.min_event_systime = self.reactor.monotonic() + 0.2
+        self.min_event_systime = self.reactor.monotonic() + 0.1
     def sync_print_time(self):
         self._calc_print_time()
     def _calc_print_time(self):
