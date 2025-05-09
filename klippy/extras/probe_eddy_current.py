@@ -226,9 +226,7 @@ class EddyGatherSamples:
         self.gcode = self._printer.lookup_object("gcode")
         # Start samples
         if not self._calibration.is_calibrated():
-            self.gcode.run_script_from_command('M117 Tip code: 118')
-            raise self._printer.command_error(
-                "Must calibrate probe_eddy_current first")
+            self.gcode.respond_info("Must calibrate probe_eddy_current first")
         sensor_helper.add_client(self._add_measurement)
     def _add_measurement(self, msg):
         if self._need_stop:
@@ -351,7 +349,7 @@ class EddyEndstopWrapper:
     def home_start(self, print_time, sample_time, sample_count, rest_time,
                    triggered=True):
         self._trigger_time = 0.
-        trigger_freq = self._calibration.height_to_freq(self._z_offset)
+        trigger_freq = self._calibration.height_to_freq(self._z_offset) if triggered == True else 1
         # [triggered] is used to distinguish whether to use contact homing
         self.homing_method = _ProbeType.TYPE_VIR_TOUCH if triggered == False else _ProbeType.TYPE_DEFAULT
         trigger_completion = self._dispatch.start(print_time)
@@ -501,7 +499,9 @@ class PrinterEddyProbe:
     def get_offsets(self):
         return self.probe_offsets.get_offsets()
     def get_status(self, eventtime):
-        return self.cmd_helper.get_status(eventtime)
+        status = self.cmd_helper.get_status(eventtime)
+        status['is_calibrated'] = self.calibration.is_calibrated()
+        return status
     def start_probe_session(self, gcmd):
         method = gcmd.get('METHOD', 'automatic').lower()
         if method in ('scan', 'rapid_scan'):
