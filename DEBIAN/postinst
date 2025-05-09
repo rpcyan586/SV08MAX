@@ -42,5 +42,6 @@ systemctl restart klipper
 systemctl restart moonraker
 
 #删除本地文件
+rm /home/sovol/printer_data/build/finishedGuide
 # rm /home/sovol/printer_data/gcodes/!(sda1)
 
