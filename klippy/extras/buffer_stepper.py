@@ -21,8 +21,8 @@ class BufferStepper:
         self.debug = config.get('debug', False)
         self.reactor = self.printer.get_reactor()
         self.kin_flush_delay = SDS_CHECK_TIME
-        self.last_kin_flush_time = self.last_kin_move_time = 0.
-        self.buffer_time_start = config.getfloat('buffer_time_start', 0.100, above=0.)
+        self.last_kin_flush_time = 0.
+        self.buffer_time_start = config.getfloat('buffer_time_start', 0.050, above=0.)
 
         buttons = self.printer.load_object(config, 'buttons')
         self.push = config.get('push_pin')
@@ -54,29 +54,30 @@ class BufferStepper:
                                     desc=self.cmd_BUFFER_STEPPER_help)
 
     def _push_handler(self, eventtime, state):
+        if state == self.push_triggered:
+            return
         self.push_triggered = state
         eventtime = self.reactor.monotonic()
         if eventtime < self.min_event_systime:
             return
         self.current_check_id += 1 
-        global_var = self.printer.lookup_object('gcode_macro _global_var')
-        status = global_var.get_status(eventtime)
-        is_push_buffer = status.get('is_push_buffer', True)
-        if self.push_triggered and is_push_buffer:
-            self.do_move(self.push_length, self.velocity, self.accel)       
-            if self.print_stats.state == 'printing':
-                self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
-            initial_push_state = self.push_triggered
-            check_id = self.current_check_id 
-            self.reactor.register_callback(
-                lambda evt: self._check_filament_jam(evt, initial_push_state, check_id),
-                eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay
-            )
+        if self.push_triggered:
+            global_var = self.printer.lookup_object('gcode_macro _global_var')
+            status = global_var.get_status(eventtime)
+            is_push_buffer = status.get('is_push_buffer', True)
+            if is_push_buffer:
+                self.do_move(self.push_length, self.velocity, self.accel)       
+                if self.print_stats.state == 'printing':
+                    self.gcode.run_script_from_command("NOZZLE_CLOG_CHECK")
+                initial_push_state = self.push_triggered
+                check_id = self.current_check_id 
+                self.reactor.register_async_callback(
+                    lambda evt: self._check_filament_jam(evt, initial_push_state, check_id),
+                    eventtime + self.get_move_duration(self.push_length, self.velocity, self.accel) + self.event_delay
+                )
     def _handle_ready(self):
-        self.min_event_systime = self.reactor.monotonic() + 0.1
+        self.min_event_systime = self.reactor.monotonic() + 0.2
     def sync_print_time(self):
-        self._calc_print_time()
-    def _calc_print_time(self):
         curtime = self.reactor.monotonic()
         est_print_time = self.mcu.estimated_print_time(curtime)
         kin_time = max(est_print_time + MIN_KIN_TIME, self.last_kin_flush_time)
@@ -108,10 +109,8 @@ class BufferStepper:
                           0., 0., 0., axis_r, 0., 0., 0., cruise_v, accel)
         self.next_cmd_time = self.next_cmd_time + accel_t + cruise_t + accel_t
         self.rail.generate_steps(self.next_cmd_time)
-        self.trapq_finalize_moves(self.trapq, self.next_cmd_time + 99999.9,
-                                  self.next_cmd_time + 99999.9)
-        #froce mcu to flush moving command
-        self.mcu.flush_moves(self.next_cmd_time, self.next_cmd_time - 30.0)
+        self.trapq_finalize_moves(self.trapq, self.next_cmd_time + 99999.9, self.next_cmd_time + 99999.9 )
+        self.mcu.flush_moves(self.next_cmd_time, self.next_cmd_time - 30.)
     def get_move_duration(self, movepos, speed, accel):
         dist = movepos
         axis_r, accel_t, cruise_t, cruise_v = force_move.calc_move_time(
@@ -170,8 +169,6 @@ class BufferStepper:
         return [stepper_positions[self.rail.get_name()], 0., 0.]
     def debug_logging(self, message):
         self.gcode.respond_info(message)
-    def get_push_triggered(self):
-        return self.push_triggered
     def get_status(self, eventtime):
         return {
             'push_triggered': self.push_triggered,
