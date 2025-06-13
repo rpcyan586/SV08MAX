@@ -37,11 +37,13 @@ systemd-tmpfiles --create
 # sudo service klipper stop
 # make flash
 # sudo service klipper start
+cp -p /home/sovol/patch/config/*.cfg /home/sovol/printer_data/config/
 
 systemctl restart klipper
 systemctl restart moonraker
+sudo systemctl restart systemd-journald
 
 #删除本地文件
-rm /home/sovol/printer_data/build/finishedGuide
+# rm /home/sovol/printer_data/build/finishedGuide
 # rm /home/sovol/printer_data/gcodes/!(sda1)
 

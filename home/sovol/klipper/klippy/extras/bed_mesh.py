@@ -355,6 +355,9 @@ class BedMeshCalibrate:
                    " |  Tool Adjusted  |   Probe")
         points = self.probe_mgr.get_base_points()
         for i, (x, y) in enumerate(points):
+            if i >= 50:  # 限制只打印前 50 个点
+                print_func("... (output truncated, total %d points)" % len(points))
+                break
             adj_pt = "(%.1f, %.1f)" % (x - x_offset, y - y_offset)
             mesh_pt = "(%.1f, %.1f)" % (x, y)
             print_func(

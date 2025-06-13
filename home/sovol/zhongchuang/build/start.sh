@@ -1,11 +1,11 @@
 #!/bin/bash
 echo "Start makerbase-client"
 time=$(date "+%Y%m%d%H%M%S")
-chmod 777 /home/sovol/zhongchuang/build/io
-/home/sovol/zhongchuang/build/io -4 0xff100028 0x010000
-echo 79 > /sys/class/gpio/export
-echo out > /sys/class/gpio/gpio79/direction
-chmod 777 /sys/class/gpio/gpio79/value
+# chmod 777 /home/sovol/zhongchuang/build/io
+# /home/sovol/zhongchuang/build/io -4 0xff100028 0x010000
+# echo 79 > /sys/class/gpio/export
+# echo out > /sys/class/gpio/gpio79/direction
+# chmod 777 /sys/class/gpio/gpio79/value
 
 # if [[ -e "/home/sovol/klipper_config/printer.cfg" && -s "/home/sovol/klipper_config/printer.cfg" ]];then
 #     echo "配置文件存在且不为空"
