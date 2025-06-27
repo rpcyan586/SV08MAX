@@ -1,0 +1,27 @@
+[Unit]
+Description=Run start.sh at boot
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/sovol/zhongchuang/build/start.sh
+WorkingDirectory=/home/sovol/zhongchuang/build
+User=root
+
+# 保持重启策略
+Restart=always
+RestartSec=5s
+
+# 让 systemd 收集 stdout 和 stderr 到 journal
+StandardOutput=journal
+StandardError=journal
+
+# 允许生成 core dump，大小无限制
+LimitCORE=infinity
+
+# 设置环境变量，方便core dump文件生成和调试（可选）
+Environment="LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libSegFault.so"
+
+[Install]
+WantedBy=multi-user.target
+

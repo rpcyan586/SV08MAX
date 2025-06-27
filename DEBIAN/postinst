@@ -37,7 +37,8 @@ systemd-tmpfiles --create
 # sudo service klipper stop
 # make flash
 # sudo service klipper start
-cp -p /home/sovol/patch/config/*.cfg /home/sovol/printer_data/config/
+
+sudo systemctl daemon-reload
 
 systemctl restart klipper
 systemctl restart moonraker

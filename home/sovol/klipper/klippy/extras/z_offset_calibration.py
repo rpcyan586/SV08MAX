@@ -94,7 +94,7 @@ class ZoffsetCalibration:
             zendstop_p1 = _contact_probe.run_contact_probe(gcmd)
             diff_z = abs(zendstop_p1[2] - zendstop_p[2])
             zendstop_p = zendstop_p1
-            if diff_z <= 0.0125:
+            if diff_z <= 0.02:
                 gcmd.respond_info("ZoffsetCalibration: Toolhead check success.")
                 break
             reprobe_cnt += 1
