@@ -3,6 +3,7 @@
 # Copyright (C) 2024-2025 Sovol3d <info@sovol3d.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
+import random
 from . import probe, probe_eddy_current, manual_probe
 import math
 import configparser
@@ -11,8 +12,12 @@ class ZoffsetCalibration:
     def __init__(self, config):
         self.printer = config.get_printer()
         self.config = config
-        x_pos_endstop, y_pos_endstop = config.getfloatlist("endstop_xy_position", count=2)
-        self.endstop_x_pos, self.endstop_y_pos = x_pos_endstop, y_pos_endstop
+        base_endstop_x, base_endstop_y = config.getfloatlist("endstop_xy_position", count=2)
+        base_center_x, base_center_y = config.getfloatlist("center_xy_position", count=2)      
+        self.endstop_x_pos = base_endstop_x + random.uniform(-10, 10)
+        self.endstop_y_pos = base_endstop_y + random.uniform(-10, 10)
+        self.center_x_pos = base_center_x + random.uniform(-10, 10)
+        self.center_y_pos = base_center_y + random.uniform(-10, 10)
         self.z_hop = config.getfloat("z_hop", default=2.0)
         self.z_hop_speed = config.getfloat('z_hop_speed', 5., above=0.)
         self.zconfig = config.getsection('stepper_z')
@@ -25,8 +30,12 @@ class ZoffsetCalibration:
         self.last_toolhead_pos = self.last_kinematics_pos = None
         self.non_contact_probe_name = config.get('non_contact_probe', None)
         self.contact_probe_name = config.get('contact_probe', None)
-        pprobe = self.printer.lookup_object("probe")
-        self.x_offset, self.y_offset, self.z_offset = pprobe.get_offsets()
+        contact_probe = self.printer.lookup_object(self.contact_probe_name)
+        self.x_offset, self.y_offset, self.z_offset = contact_probe.get_offsets()       
+        if self.x_offset == 0 and self.y_offset == 0:
+            raise config.error("ZoffsetCalibration: Check the x and y offset from [%s] - "
+                               "it seems both are 0 and the Probe can't be at the same position as the nozzle :-)" 
+                               % self.contact_probe_name)
     def _call_macro(self, macro):
         self.gcode.run_script_from_command(macro)
     def cmd_Z_OFFSET_CALIBRATION(self, gcmd):
@@ -62,7 +71,8 @@ class ZoffsetCalibration:
         pheaters.set_temperature(pheater_extruder.heater, extruder_temp, wait=True)
         # Home xy
         curtime = self.printer.get_reactor().monotonic()
-        if 'xy' not in self.toolhead.get_status(curtime)['homed_axes']:
+        current_pos = self.toolhead.get_position()
+        if 'xy' not in self.toolhead.get_status(curtime)['homed_axes'] or current_pos[2] < 5:
             gcmd_G28 = self.gcode.create_gcode_command("G28", "G28", {'X': 0, 'Y': 0})
             phoming.cmd_G28(gcmd_G28)
         pos = self.toolhead.get_position()
