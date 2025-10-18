@@ -119,6 +119,10 @@ class BufferStepper:
     def _check_filament_jam(self, eventtime, initial_push_state, check_id):
         if self.current_check_id != check_id or self.push_triggered != initial_push_state or self.print_stats.state == 'paused' or getattr(self, '_in_pause', False):
             return
+        global_var = self.printer.lookup_object('gcode_macro _global_var')
+        status = global_var.get_status(eventtime)
+        if status.get('disable_filament_jam_detection', False):
+            return
         filament_sensor = self.printer.lookup_object('filament_switch_sensor filament_sensor')
         filament_detected = filament_sensor.runout_helper.filament_present
         if filament_detected:

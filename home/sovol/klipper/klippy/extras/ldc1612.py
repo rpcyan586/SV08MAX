@@ -70,13 +70,14 @@ class DriveCurrentCalibrate:
         self.sensor.set_reg(REG_CONFIG, old_config)
         is_in_progress = False
         # Report found value to user
-        drive_cur = (reg_drive_current0 >> 6) & 0x1f
+        self.drive_cur = (reg_drive_current0 >> 6) & 0x1f
+        self.sensor.set_reg(REG_DRIVE_CURRENT0, self.drive_cur << 11)
         gcmd.respond_info(
             "%s: reg_drive_current: %d\n"
             "The SAVE_CONFIG command will update the printer config file\n"
-            "with the above and restart the printer." % (self.name, drive_cur))
+            "with the above and restart the printer." % (self.name, self.drive_cur))
         configfile = self.printer.lookup_object('configfile')
-        configfile.set(self.name, 'reg_drive_current', "%d" % (drive_cur,))
+        configfile.set(self.name, 'reg_drive_current', "%d" % (self.drive_cur,))
 
 # Interface class to LDC1612 mcu support
 class LDC1612:

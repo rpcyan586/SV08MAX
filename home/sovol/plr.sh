@@ -11,6 +11,11 @@ last_file=$(sed -n "s/.*last_file *= *'\([^']*\)'.*/\1/p" /home/sovol/printer_da
 last_file=$(printf "%s" "$last_file")
 echo "$last_file"
 
+power_resume_z=$(sed -n "s/.*power_resume_z *= *\([0-9.]*\).*/\1/p" /home/sovol/printer_data/config/saved_variables.cfg)
+power_resume_z=$(printf "%s" "$power_resume_z")
+
+echo "power_resume_z=$power_resume_z"
+
 plr=$last_file
 PLR_PATH=~/printer_data/gcodes/plr
 
@@ -48,30 +53,47 @@ echo 'G90' >> "${PLR_PATH}/${plr}"
 echo 'G28 X Y' >> "${PLR_PATH}/${plr}"  # For test
 
 # 调整高度，防止撞模型
-adjusted_height=$(echo "$height + 5" | bc)
+# 比较两个浮点数
+if awk "BEGIN {exit !(\"$height\" == \"$power_resume_z\")}"
+then
+    adjusted_height=$(echo "$height + 10" | bc)
+    echo "height==power_resume_z $height, $power_resume_z" >> ~/../mount.log
+else
+    adjusted_height=$(echo "$height + 9.4" | bc)
+    echo "height!=power_resume_z $height, $power_resume_z" >> ~/../mount.log
+fi
+
 echo "SET_KINEMATIC_POSITION Z=$adjusted_height" >> "${PLR_PATH}/${plr}"
 
-# 提取温度控制指令（M104, M140, M109, M190），写入续打文件
-sed "/ Z$height/q" "$TMP_FILE" | grep -E 'M104|M140|M109|M190' >> "${PLR_PATH}/${plr}"
+# 提取温度控制指令（M104, M140, M109, M190），写入续打文件  M104|M109|
+sed "/ Z$height/q" "$TMP_FILE" | grep -E 'M140|M190' >> "${PLR_PATH}/${plr}"
+
+# 提取 G-code 尾部注释中的温度信息
+end_block=$(sed -n '/; CONFIG_BLOCK_START/,$p' "$TMP_FILE" | tr '\n' ' ' | sed -E 's/ ;[^ ]* //g' | sed -E 's/\\\\n/;/g')
+# bed_temp=$(echo "$end_block" | tr ';' '\n' | grep 'material_bed_temperature' | sed -n 's/.* = /M190 S/p' | head -1)
+print_temp=$(sed -n '/; CONFIG_BLOCK_START/,$p' "$TMP_FILE" | \
+             grep '^; nozzle_temperature = ' | \
+             sed -n 's/^; nozzle_temperature = /M109 S/p' | head -1)
+
+[ -n "$print_temp" ] && echo "$print_temp" >> "${PLR_PATH}/${plr}"
+# [ -n "$bed_temp" ] && echo "$bed_temp" >> "${PLR_PATH}/${plr}"
+
 
 # 单独写一条风扇控制指令（50%功率）
 echo "M106 S127" >> "${PLR_PATH}/${plr}"
 
-# 提取 G-code 尾部注释中的温度信息
-end_block=$(sed -n '/;End of Gcode/,$p' "$TMP_FILE" | tr '\n' ' ' | sed -E 's/ ;[^ ]* //g' | sed -E 's/\\\\n/;/g')
-bed_temp=$(echo "$end_block" | tr ';' '\n' | grep 'material_bed_temperature' | sed -n 's/.* = /M190 S/p' | head -1)
-print_temp=$(echo "$end_block" | tr ';' '\n' | grep 'material_print_temperature' | sed -n 's/.* = /M109 S/p' | head -1)
-
-[ -n "$bed_temp" ] && echo "$bed_temp" >> "${PLR_PATH}/${plr}"
-[ -n "$print_temp" ] && echo "$print_temp" >> "${PLR_PATH}/${plr}"
 
 # 等待温度达到
 sed -i 's/^M140/M190/;s/^M104/M109/' "${PLR_PATH}/${plr}"
 echo 'plr_temperature_wait' >> "${PLR_PATH}/${plr}"
 echo 'M106 S255' >> "${PLR_PATH}/${plr}"
 
+echo 'G91' >> "${PLR_PATH}/${plr}"
+echo 'G1 E3' >> "${PLR_PATH}/${plr}"
+echo 'G90' >> "${PLR_PATH}/${plr}"
+
 # 恢复打印点坐标
-f_value=10000
+f_value=12000
 x_value=$(echo "$commandline" | grep -oP '(?<=X)[0-9.]+')
 y_value=$(echo "$commandline" | grep -oP '(?<=Y)[0-9.]+')
 z_value=$(echo "$commandline" | grep -oP '(?<=Z)[0-9.]+')
