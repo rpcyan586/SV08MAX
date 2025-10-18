@@ -39,6 +39,7 @@ class ZoffsetCalibration:
     def _call_macro(self, macro):
         self.gcode.run_script_from_command(macro)
     def cmd_Z_OFFSET_CALIBRATION(self, gcmd):
+        toolhead = self.printer.lookup_object('toolhead')
         try:
             _non_contact_probe = self.printer.lookup_object(self.non_contact_probe_name)
             _contact_probe = self.printer.lookup_object(self.contact_probe_name)
@@ -51,6 +52,11 @@ class ZoffsetCalibration:
         if _non_contact_probe.calibration.is_calibrated() == True and gcmd.get("METHOD", "default") == 'default':
             gcmd.respond_info("ZoffsetCalibration: Eddy data already exists")
             return
+        drive_cur = self.config.getint("reg_drive_current", 0, minval=0, maxval=31)
+        if drive_cur == 0:
+            gcmd_LDC = self.gcode.create_gcode_command("cmd_LDC_CALIBRATE", "cmd_LDC_CALIBRATE", {})
+            _contact_probe.sensor_helper.dccal.cmd_LDC_CALIBRATE(gcmd_LDC)
+            toolhead.dwell(0.1)
         if self.config.has_section('homing_override'):
             phoming = self.printer.lookup_object('homing_override')
         else:

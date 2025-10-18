@@ -368,6 +368,9 @@ class EddyEndstopWrapper:
                 raise self._printer.command_error(
                     "Communication timeout during homing")
             self.gcode.run_script_from_command('M117 Tip code: 123')
+            drive_cur = 0
+            configfile = self._printer.lookup_object('configfile')
+            configfile.set(self._calibration.name, 'reg_drive_current', "%d" % (drive_cur,))
             raise self._printer.command_error("Eddy current sensor error")
         if res != mcu.MCU_trsync.REASON_ENDSTOP_HIT:
             return 0.
